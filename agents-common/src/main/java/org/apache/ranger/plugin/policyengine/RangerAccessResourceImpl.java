@@ -109,6 +109,13 @@ public class RangerAccessResourceImpl implements RangerMutableResource {
 	}
 
 	@Override
+	public void removeValue(String name) {
+		if(elements != null && elements.containsKey(name)) {
+			elements.remove(name);
+		}
+	}
+
+	@Override
 	public void setServiceDef(final RangerServiceDef serviceDef) {
 		this.serviceDef = serviceDef;
 		this.stringifiedValue = this.stringifiedCacheKeyValue = this.leafName = null;

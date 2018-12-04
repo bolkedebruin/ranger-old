@@ -27,7 +27,8 @@
     "1":{"name":"PII"},
     "2":{"name":"EXPIRES_ON","attributeDefs":[{"name":"expiry_date","type":"date"}]},
     "3":{"name":"FINANCE"},
-    "4":{"name":"PCI"}
+    "4":{"name":"PCI"},
+    "5":{"name":"RISK"}
   },
 
   "tags": {
@@ -59,60 +60,70 @@
   "tests":[
     {"name": "url-any",
       "resource":{"elements":{"database":"default"}},
+      "clientTags": [],
       "accessType": "",
       "result":[]
     }
     ,
     {"name":"finance-any",
       "resource":{"elements":{"database":"finance"}},
+      "clientTags": [{"name":"RISK"}],
       "accessType": "",
-      "result":[{"type":"EXPIRES_ON"}, {"type":"FINANCE"}, {"type":"PII"}, {"type":"EXPIRES_ON"}]
+      "result":[{"type":"EXPIRES_ON"}, {"type":"FINANCE"}, {"type":"PII"}, {"type":"EXPIRES_ON"}, {"type":"RISK"}]
     }
     ,
     {"name":"finance-and-tax2010any",
       "resource":{"elements":{"database":"finance", "table":"tax_2010"}},
+      "clientTags": [{"name":"RISK"}, {"name":"UNKNOWN"}],
       "accessType": "",
-      "result":[{"type":"FINANCE"},{"type":"EXPIRES_ON"}, {"type":"PII"}, {"type":"EXPIRES_ON"}]
+      "result":[{"type":"FINANCE"},{"type":"EXPIRES_ON"}, {"type":"PII"}, {"type":"EXPIRES_ON"}, {"type":"RISK"}]
     }
     ,
     {"name":"hr-any",
       "resource":{"elements":{"database":"hr"}},
+      "clientTags": [],
       "accessType": "",
       "result":[{"type":"PII"}]
     }
     ,
     {"name":"none-any",
       "resource":{"elements":{}},
+      "clientTags": [],
       "accessType": "",
       "result":[{"type":"EXPIRES_ON"}, {"type":"FINANCE"}, {"type":"PII"}, {"type":"EXPIRES_ON"}, {"type":"PCI"}]
     }
     ,
     {"name":"hr.employee.ssn",
       "resource":{"elements":{"database":"hr","table":"employee","column":"ssn"}},
+      "clientTags": [],
       "accessType": "read",
       "result":[{"type":"PII"}]
     }
     ,
     {"name":"hr.employee.id",
       "resource":{"elements":{"database":"hr","table":"employee","column":"id"}},
+      "clientTags": [],
       "accessType": "read",
       "result":[]
     }
     ,
     {"name":"finance.tax_2010",
       "resource":{"elements":{"database":"finance","table":"tax_2010"}},
+      "clientTags": [],
       "accessType": "read",
       "result":[{"type":"EXPIRES_ON"},{"type":"FINANCE"}]
     }
     ,
     {"name":"finance.tax_2010.ssn",
       "resource":{"elements":{"database":"finance","table":"tax_2010","column":"ssn"}},
+      "clientTags": [],
       "accessType": "read",
       "result":[{"type":"EXPIRES_ON"},{"type":"PII"},{"type":"FINANCE"}, {"type":"EXPIRES_ON"}]
     }
     ,
     {"name":"finance.tax_2010.id",
       "resource":{"elements":{"database":"finance","table":"tax_2010","column":"id"}},
+      "clientTags": [],
       "accessType": "read",
       "result":[{"type":"EXPIRES_ON"},{"type":"FINANCE"}]
     }

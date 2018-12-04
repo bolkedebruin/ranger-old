@@ -102,6 +102,7 @@ public class TestTagEnricher {
         List<String> resultTags   = new ArrayList<>();
 
         for (TestData test : testCase.tests) {
+            test.resource.setValue(RangerTagEnricher.KEY_CLIENT_TAGS, test.clientTags);
             RangerAccessRequestImpl request = new RangerAccessRequestImpl(test.resource, test.accessType, "testUser", null);
 
             tagEnricher.enrich(request);
@@ -141,10 +142,11 @@ public class TestTagEnricher {
 
 
         class TestData {
-            public String               name;
-            public RangerAccessResource resource;
-            public String               accessType;
-            public List<RangerTag>      result;
+            public String                name;
+            public RangerAccessResourceImpl resource;
+            public Set<RangerClientTag>  clientTags;
+            public String                accessType;
+            public List<RangerTag>       result;
         }
     }
 

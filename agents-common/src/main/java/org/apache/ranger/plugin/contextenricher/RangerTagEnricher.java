@@ -31,9 +31,11 @@ import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.model.RangerServiceResource;
 import org.apache.ranger.plugin.model.RangerTag;
+import org.apache.ranger.plugin.model.RangerTagDef;
 import org.apache.ranger.plugin.model.validation.RangerServiceDefHelper;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessResource;
+import org.apache.ranger.plugin.policyengine.RangerMutableResource;
 import org.apache.ranger.plugin.policyresourcematcher.RangerDefaultPolicyResourceMatcher;
 import org.apache.ranger.plugin.policyresourcematcher.RangerPolicyResourceMatcher;
 import org.apache.ranger.plugin.service.RangerAuthContext;
@@ -68,6 +70,7 @@ public class RangerTagEnricher extends RangerAbstractContextEnricher {
 	public static final String TAG_REFRESHER_POLLINGINTERVAL_OPTION = "tagRefresherPollingInterval";
 	public static final String TAG_RETRIEVER_CLASSNAME_OPTION       = "tagRetrieverClassName";
 	public static final String TAG_DISABLE_TRIE_PREFILTER_OPTION    = "disableTrieLookupPrefilter";
+	public static final String KEY_CLIENT_TAGS											= "clientTags";
 
 	private RangerTagRefresher                 tagRefresher;
 	private RangerTagRetriever                 tagRetriever;
@@ -341,16 +344,26 @@ public class RangerTagEnricher extends RangerAbstractContextEnricher {
 
 		RangerAccessResource resource = request.getResource();
 
+		// Remove client tags from the values otherwise the policy engine can't match
+		Set<?> clientTags = null;
+		if (request.getResource().getValue(KEY_CLIENT_TAGS) instanceof Set<?>) {
+			clientTags = (Set<?>)request.getResource().getValue(KEY_CLIENT_TAGS);
+			RangerMutableResource res = (RangerMutableResource)request.getResource();
+			res.removeValue(KEY_CLIENT_TAGS);
+		} else if (request.getResource().getValue(KEY_CLIENT_TAGS) != null){
+			LOG.warn("RangerTagEnricher.findMatchingTags(" + resource + ") - invalid client tags specified");
+		}
+
 		if ((resource == null || resource.getKeys() == null || resource.getKeys().isEmpty()) && request.isAccessTypeAny()) {
 			ret = enrichedServiceTags.getTagsForEmptyResourceAndAnyAccess();
 		} else {
-
 			final List<RangerServiceResourceMatcher> serviceResourceMatchers = getEvaluators(resource, enrichedServiceTags);
+
+			Map<Integer, RangerTagForEval> lookup = new HashMap<>();
 
 			if (CollectionUtils.isNotEmpty(serviceResourceMatchers)) {
 
 				for (RangerServiceResourceMatcher resourceMatcher : serviceResourceMatchers) {
-
 					final RangerPolicyResourceMatcher.MatchType matchType = resourceMatcher.getMatchType(resource, request.getContext());
 
 					final boolean isMatched;
@@ -364,13 +377,37 @@ public class RangerTagEnricher extends RangerAbstractContextEnricher {
 					}
 
 					if (isMatched) {
-						if (ret == null) {
-							ret = new HashSet<>();
+						Set<RangerTagForEval> tagsForService = getTagsForServiceResource(enrichedServiceTags.getServiceTags(), resourceMatcher.getServiceResource(), matchType);
+						for (RangerTagForEval tag : tagsForService) {
+							lookup.put(tag.hashCode(), tag);
 						}
-						ret.addAll(getTagsForServiceResource(enrichedServiceTags.getServiceTags(), resourceMatcher.getServiceResource(), matchType));
-					}
 
+						// client supplied tags can only apply to the resource requested
+						if (clientTags != null && matchType == RangerPolicyResourceMatcher.MatchType.SELF) {
+							Map<String, RangerTagDef> tagDefsByName = enrichedServiceTags.getTagDefsByName();
+
+							for (Object oTag : clientTags) {
+								if (!RangerClientTag.class.isInstance(oTag)) {
+									LOG.warn(("RangerTagEnricher.findMatchingTags(" + resource + ") - tag is not a RangerClientTag"));
+									continue;
+								}
+
+								RangerClientTag tag = (RangerClientTag)oTag;
+								RangerTagDef tagDef = tagDefsByName.get(tag.getName());
+
+								// only add client tags we have definitions for
+								if (tagDef != null) {
+									RangerTagForEval tagForEval = new RangerTagForEval(tag, tagDef.getName(), matchType);
+									// todo: find out which one is newer by using updated which is not available for eval tags
+									lookup.put(tagForEval.hashCode(), tagForEval);
+								}
+							}
+						}
+					}
 				}
+			}
+			if (ret == null) {
+				ret = new HashSet<>(lookup.values());
 			}
 		}
 
@@ -507,6 +544,7 @@ public class RangerTagEnricher extends RangerAbstractContextEnricher {
 		final private List<RangerServiceResourceMatcher> serviceResourceMatchers;
 		final private Map<String, RangerResourceTrie<RangerServiceResourceMatcher>>    serviceResourceTrie;
 		final private Set<RangerTagForEval>              tagsForEmptyResourceAndAnyAccess; // Used only when accessed resource is empty and access type is 'any'
+		final private Map<String, RangerTagDef>					 tagDefsByName; // Lookup to match client tags against tag defs
 
 		EnrichedServiceTags(ServiceTags serviceTags, List<RangerServiceResourceMatcher> serviceResourceMatchers,
 							Map<String, RangerResourceTrie<RangerServiceResourceMatcher>> serviceResourceTrie, Set<RangerTagForEval> tagsForEmptyResourceAndAnyAccess) {
@@ -514,11 +552,18 @@ public class RangerTagEnricher extends RangerAbstractContextEnricher {
 			this.serviceResourceMatchers = serviceResourceMatchers;
 			this.serviceResourceTrie     = serviceResourceTrie;
 			this.tagsForEmptyResourceAndAnyAccess          = tagsForEmptyResourceAndAnyAccess;
+
+			Map<Long, RangerTagDef> tagDefs = serviceTags.getTagDefinitions();
+			tagDefsByName = new HashMap<>();
+			for (RangerTagDef tagDef : tagDefs.values()) {
+				tagDefsByName.put(tagDef.getName(), tagDef);
+			}
 		}
 		ServiceTags getServiceTags() {return serviceTags;}
 		List<RangerServiceResourceMatcher> getServiceResourceMatchers() { return serviceResourceMatchers;}
 		Map<String, RangerResourceTrie<RangerServiceResourceMatcher>> getServiceResourceTrie() { return serviceResourceTrie;}
 		Set<RangerTagForEval> getTagsForEmptyResourceAndAnyAccess() { return tagsForEmptyResourceAndAnyAccess;}
+		Map<String, RangerTagDef> getTagDefsByName() { return tagDefsByName;}
 	}
 
 	static class RangerTagRefresher extends Thread {

@@ -77,6 +77,16 @@ public class RangerTagForEval implements Serializable {
         this.validityPeriodEvaluators = createValidityPeriodEvaluators();
     }
 
+    public RangerTagForEval(RangerClientTag tag, String type, RangerPolicyResourceMatcher.MatchType matchType) {
+        this.type = type;
+        this.attributes = tag.getAttributes();
+        this.options = tag.getOptions();
+        this.matchType = matchType;
+        this.validityPeriods = tag.getValidityPeriods();
+
+        this.validityPeriodEvaluators = createValidityPeriodEvaluators();
+    }
+
     public String getType() { return type;}
 
     public Map<String, String> getAttributes() { return attributes; }

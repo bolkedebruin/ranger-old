@@ -26,5 +26,7 @@ public interface RangerMutableResource extends RangerAccessResource {
 	void setOwnerUser(String ownerUser);
 
 	void setValue(String type, Object value);
+	void removeValue(String type);
+
 	void setServiceDef(RangerServiceDef serviceDef);
 }
